@@ -39,7 +39,7 @@ class State():
 		self.turn=turn
 		self.moves=moves
 
-	# 每个回合都从"self.turn * self.MOVES"中随机选择一个移动值nextmove, 并以nextmove生成下一个State为next.
+	# 根据概率随机生成当前状态的一个新的子状态：从"self.turn * self.MOVES"中随机选择一个移动值nextmove, 并以nextmove生成下一个State为next.
 	def next_state(self):
 		nextmove=random.choice([x*self.turn for x  in self.MOVES])
 		next=State(self.value+nextmove, self.moves+[nextmove],self.turn-1)
@@ -105,9 +105,9 @@ class Node():
 		s="Node; children: %d; visits: %d; reward: %f"%(len(self.children),self.visits,self.reward)
 		return s
 
-# 功能:基于"选择,拓展,仿真,回溯"实现的UCT的MCTS，用于在给定budget内找到最佳的子节点
-# 输入:budget , root 搜索树的根节点, num_moves_lambda 可选函数用于动态确定节点的最大子节点数;
-# 输出:返回经过budget次搜索后,root的BESTCHILD(即返回root的最优子节点,而不是最优叶子节点)
+# 功能:基于"选择,拓展,仿真,回溯"实现的UCT的MCTS，用于在给定budget内找到最佳的子节点。
+# 输入:budget 4个动作循环迭代的次数, root 搜索树的根节点, num_moves_lambda 可选函数用于动态确定节点的最大子节点数;
+# 输出:返回经过budget次迭代后,root的BESTCHILD(即返回root的最优子节点,而不是最优叶子节点。即当前局面的最佳落子)
 def UCTSEARCH(budget,root,num_moves_lambda = None):
 	# "Selection,Expansion,Simulation,Backpropagation"循环迭代,共执行budget次(每10000次打印日志)。返回最终root的BESTCHILD.
 	for iter in range(int(budget)):
@@ -116,7 +116,7 @@ def UCTSEARCH(budget,root,num_moves_lambda = None):
 			logger.info(root)
 		front=TREEPOLICY(root, num_moves_lambda) # Selection,Expansion
 		reward=DEFAULTPOLICY(front.state)		 # Simulation
-		BACKUP(front,reward)					 # Backpropagation
+		BACKUP(front,reward)					 # Backpropagation 从front到root更新回溯路上每个节点的visits与reward
 	return BESTCHILD(root,0) # SCALAR设置为0,意味着选择root的子节点时只考虑exploit不考虑explore.
 
 # 功能: Selection,Expansion,用于MCTS搜索树中选择和扩展节点,并返回最终选择节点; 输入:node 当前节点, num_moves_lambda 动态确定节点的最大子节点数;
@@ -136,17 +136,20 @@ def TREEPOLICY(node, num_moves_lambda):
 				node=BESTCHILD(node,SCALAR)
 	return node
 
-# 扩展当前节点,生成一个新的子节点,添加到当前节点的子节点列表中,并返回.(新拓展的子节点如果不是terminal状态,就不能与其他已存在的子节点重复)
+# 根据概率扩展当前节点,生成一个新的子节点,添加到当前节点的子节点列表中,并返回该子节点.(新拓展的子节点不能与其他已存在的子节点重复。terminal状态除外)
 def EXPAND(node):
 	tried_children=[c.state for c in node.children]
-	new_state=node.state.next_state()
+	# 根据概率随机生成当前状态的一个新的子状态
+	new_state=node.state.next_state() 
+	# 根据概率随机生成当前状态的一个新的子状态，并保证该子状态之前未出现过
 	while new_state in tried_children and new_state.terminal()==False:
-	    new_state=node.state.next_state()
+	    new_state=node.state.next_state() 
 	node.add_child(new_state)
 	return node.children[-1]
 
 #current this uses the most vanilla MCTS formula it is worth experimenting with THRESHOLD ASCENT (TAGS)
-# 功能:使用UCB1从当前节的子节点中选择一个最佳的子节点(注:是子节点不是叶子节点). 输入:node 当前节点, scalar UCB1中调整探索和利用之间平衡的参数.
+# 功能:使用UCB1从当前节的子节点中选择一个最佳的子节点(如果有多个子节点的UCB1值相同，则在多个最优中随机选择一个)，并返回(注:是子节点不是叶子节点). 
+# 输入:node 当前节点, scalar UCB1中调整探索和利用之间平衡的参数.
 def BESTCHILD(node,scalar):
 	bestscore=0.0
 	bestchildren=[]
@@ -163,9 +166,11 @@ def BESTCHILD(node,scalar):
 		logger.warn("OOPS: no best child found, probably fatal")
 	return random.choice(bestchildren)
 
-# 功能: Simulation,从当前状态开始模拟，直到终止状态，并返回终止状态奖励(根据终止状态的value到达goal的近似程度计算得到)。 输入:state 当前状态.
+# 功能: Simulation,从当前状态开始模拟，直到终止状态，并返回终止状态奖励(reward的值见reward()函数的视线)。 
+# 输入:state 当前状态.
 def DEFAULTPOLICY(state):
 	while state.terminal()==False:
+		# 根据概率随机生成当前状态的一个新的子状态
 		state=state.next_state()
 	return state.reward()
 
@@ -183,10 +188,11 @@ if __name__=="__main__":
 	parser.add_argument('--levels', action="store", required=True, type=int, choices=range(State.NUM_TURNS+1))
 	args=parser.parse_args()
 	
-	# 通过打印日志可以看出,mian中实现的是一个下棋过程,每一步都选择根节点的最优子节点print(而不是选择最优叶子节点)。总共走args.levels步。
-	# 且每一步中都会以当前状态重新进行UCTSEARCH,且search的最大步数是"args.num_sims/(l+1)"
+	# 通过打印日志可以看出,main中实现的是一个下棋过程,每一步都选择根节点的最优子节点print(即当前节点是执棋者所面对的局面，当前节点最优的子节点才是执棋者下一步应该的落子)。
+	# 总共走args.levels步。且每一步中都会以当前状态重新进行UCTSEARCH,且search的最大步数是"args.num_sims/(l+1)"
 	current_node=Node(State())
 	for l in range(args.levels):
+		# UCTSEARCH每次返回的都是current_node最优的子节点，即当前局面的下一步最优落子。即交替下棋args.levels次
 		current_node=UCTSEARCH(args.num_sims/(l+1),current_node)
 		print("level %d"%l)
 		print("Num Children: %d"%len(current_node.children))
