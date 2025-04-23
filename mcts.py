@@ -39,7 +39,7 @@ class State():
 		self.turn=turn
 		self.moves=moves
 
-	# 根据概率随机生成当前状态的一个新的子状态：从"self.turn * self.MOVES"中随机选择一个移动值nextmove, 并以nextmove生成下一个State为next.
+	# 根据概率随机生成当前状态的一个新的子状态：从"self.turn * self.MOVES"中随机选择一个移动值 nextmove, 并以nextmove生成下一个State为next.
 	def next_state(self):
 		nextmove=random.choice([x*self.turn for x  in self.MOVES])
 		next=State(self.value+nextmove, self.moves+[nextmove],self.turn-1)
@@ -117,7 +117,7 @@ def UCTSEARCH(budget,root,num_moves_lambda = None):
 		front=TREEPOLICY(root, num_moves_lambda) # Selection,Expansion
 		reward=DEFAULTPOLICY(front.state)		 # Simulation
 		BACKUP(front,reward)					 # Backpropagation 从front到root更新回溯路上每个节点的visits与reward
-	return BESTCHILD(root,0) # SCALAR设置为0,意味着选择root的子节点时只考虑exploit不考虑explore.
+	return BESTCHILD(root,0) # SCALAR 设置为0,意味着选择root的子节点时只考虑 exploit 不考虑 explore.
 
 # 功能: Selection,Expansion,用于MCTS搜索树中选择和扩展节点,并返回最终选择节点; 输入:node 当前节点, num_moves_lambda 动态确定节点的最大子节点数;
 def TREEPOLICY(node, num_moves_lambda):
@@ -149,7 +149,7 @@ def EXPAND(node):
 
 #current this uses the most vanilla MCTS formula it is worth experimenting with THRESHOLD ASCENT (TAGS)
 # 功能:使用UCB1从当前节的子节点中选择一个最佳的子节点(如果有多个子节点的UCB1值相同，则在多个最优中随机选择一个)，并返回(注:是子节点不是叶子节点). 
-# 输入:node 当前节点, scalar UCB1中调整探索和利用之间平衡的参数.
+# 输入:node 当前节点, scalar UCB1中调整探索和利用之间平衡的参数(α).
 def BESTCHILD(node,scalar):
 	bestscore=0.0
 	bestchildren=[]
@@ -183,16 +183,17 @@ def BACKUP(node,reward):
 	return
 
 if __name__=="__main__":
+	# --num_sims:模拟(simulation)运行的步数; --levels:游戏的总回合数(即下棋的步数)
 	parser = argparse.ArgumentParser(description='MCTS research code')
 	parser.add_argument('--num_sims', action="store", required=True, type=int)
 	parser.add_argument('--levels', action="store", required=True, type=int, choices=range(State.NUM_TURNS+1))
 	args=parser.parse_args()
 	
 	# 通过打印日志可以看出,main中实现的是一个下棋过程,每一步都选择根节点的最优子节点print(即当前节点是执棋者所面对的局面，当前节点最优的子节点才是执棋者下一步应该的落子)。
-	# 总共走args.levels步。且每一步中都会以当前状态重新进行UCTSEARCH,且search的最大步数是"args.num_sims/(l+1)"
+	# 总共走 args.levels 步。且每一步中都会以当前状态重新进行 UCTSEARCH,且search的最大步数是"args.num_sims/(l+1)"
 	current_node=Node(State())
 	for l in range(args.levels):
-		# UCTSEARCH每次返回的都是current_node最优的子节点，即当前局面的下一步最优落子。即交替下棋args.levels次
+		# UCTSEARCH 每次返回的都是 current_node 最优的子节点，即当前局面的下一步最优落子。即交替下棋args.levels次
 		current_node=UCTSEARCH(args.num_sims/(l+1),current_node)
 		print("level %d"%l)
 		print("Num Children: %d"%len(current_node.children))
